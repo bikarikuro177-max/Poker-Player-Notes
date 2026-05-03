@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="プレーヤーメモ">
+<title>プレーヤーメモ</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+:root{--bg1:#0d2a3a;--bg2:#0a3d4a;--bg3:#0d4a5a;--accent:#1e8fa8;--text:#e0f4ff;--muted:rgba(160,220,240,0.6);--faint:rgba(100,200,220,0.25);--border:rgba(100,200,220,0.15)}
+html,body{height:100%;background:var(--bg1);font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;color:var(--text);overscroll-behavior:none}
+body{display:flex;flex-direction:column;min-height:100vh;min-height:-webkit-fill-available}
+
+/* ---- Layout ---- */
+#app{display:flex;flex-direction:column;height:100vh;height:-webkit-fill-available;background:linear-gradient(160deg,var(--bg1) 0%,var(--bg2) 50%,var(--bg3) 100%)}
+.safe-top{height:env(safe-area-inset-top,0px)}
+.safe-bot{height:env(safe-area-inset-bottom,0px)}
+
+/* ---- Header ---- */
+.header{background:rgba(0,0,0,0.35);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.08);flex-shrink:0}
+.header h1{font-size:17px;font-weight:600;letter-spacing:0.02em;flex:1;text-align:center}
+.btn-icon{background:none;border:none;color:#7ecfea;cursor:pointer;font-size:22px;padding:4px 6px;line-height:1;flex-shrink:0}
+
+/* ---- Search ---- */
+.search-wrap{padding:10px 12px;background:rgba(0,0,0,0.18);flex-shrink:0}
+.search-wrap input{width:100%;background:rgba(0,20,30,0.55);border:1px solid var(--faint);border-radius:20px;padding:9px 16px;color:var(--text);font-size:14px;outline:none;-webkit-appearance:none}
+.search-wrap input::placeholder{color:rgba(180,220,240,0.45)}
+
+/* ---- List ---- */
+.player-list{flex:1;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:8px;-webkit-overflow-scrolling:touch}
+.player-card{background:rgba(0,20,35,0.55);border-radius:14px;padding:11px 13px;display:flex;align-items:center;gap:11px;cursor:pointer;border:1px solid var(--border);active:opacity:.8}
+.avatar{width:48px;height:48px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(0,80,100,0.6);flex-shrink:0;font-size:22px}
+.avatar img{width:100%;height:100%;object-fit:cover}
+.card-info{flex:1;min-width:0}
+.card-name{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-preview{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px}
+.card-count{font-size:11px;color:rgba(120,200,220,0.8);background:rgba(0,80,120,0.45);border-radius:10px;padding:3px 8px;flex-shrink:0}
+.empty{text-align:center;padding:50px 20px;color:rgba(160,220,240,0.35);font-size:14px;line-height:1.8}
+
+/* ---- Modal overlay ---- */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:flex-end;justify-content:center;z-index:100;opacity:0;pointer-events:none;transition:opacity .22s}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{background:#0c2433;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;-webkit-overflow-scrolling:touch;transform:translateY(100%);transition:transform .25s cubic-bezier(.32,1,.23,1);padding-bottom:env(safe-area-inset-bottom,16px)}
+.modal-bg.open .modal{transform:translateY(0)}
+.modal-handle{width:36px;height:4px;background:rgba(255,255,255,0.2);border-radius:2px;margin:10px auto 4px}
+.modal-header{padding:4px 16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,0.07)}
+.modal-title{font-size:16px;font-weight:600}
+.modal-body{padding:14px 16px}
+
+/* ---- Avatar picker ---- */
+.avatar-section{display:flex;justify-content:center;margin-bottom:16px}
+.avatar-lg{width:80px;height:80px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:rgba(0,80,110,0.65);cursor:pointer;position:relative;font-size:38px}
+.avatar-lg img{width:100%;height:100%;object-fit:cover}
+.avatar-edit-badge{position:absolute;bottom:2px;right:2px;background:var(--accent);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;color:white}
+
+/* ---- Form ---- */
+.field-label{font-size:11px;color:#7ecfea;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;margin-top:14px}
+.modal input[type=text],.modal textarea{width:100%;background:rgba(0,10,20,0.55);border:1px solid var(--faint);border-radius:10px;padding:10px 12px;color:var(--text);font-size:14px;font-family:inherit;outline:none;resize:none;-webkit-appearance:none}
+.modal input[type=text]:focus,.modal textarea:focus{border-color:rgba(100,200,220,0.6)}
+
+/* ---- Memo list ---- */
+.memo-list{display:flex;flex-direction:column;gap:7px;margin-top:7px}
+.memo-item{background:rgba(0,10,28,0.55);border-radius:10px;padding:9px 11px;border-left:3px solid var(--accent)}
+.memo-view{display:flex;align-items:flex-start;gap:6px}
+.memo-text{flex:1;font-size:13px;color:rgba(185,235,245,0.9);line-height:1.45;word-break:break-all}
+.memo-actions{display:flex;gap:2px;flex-shrink:0}
+.memo-btn{background:none;border:none;cursor:pointer;font-size:15px;padding:2px 4px;line-height:1}
+.memo-btn.edit{color:rgba(100,200,220,0.75)}
+.memo-btn.del{color:rgba(255,100,100,0.65)}
+.memo-date{font-size:10px;color:rgba(110,175,195,0.5);margin-top:5px}
+.memo-date.was-edited{color:rgba(130,195,150,0.55)}
+
+/* ---- Memo edit inline ---- */
+.memo-edit-area textarea{width:100%;background:rgba(0,20,38,0.75);border:1px solid rgba(100,200,220,0.5);border-radius:8px;padding:7px 9px;color:var(--text);font-size:13px;font-family:inherit;outline:none;resize:none;min-height:58px}
+.memo-edit-btns{display:flex;gap:6px;justify-content:flex-end;margin-top:5px}
+.memo-edit-btns button{font-size:12px;border-radius:8px;padding:5px 12px;cursor:pointer;border:none;font-family:inherit}
+.btn-confirm{background:var(--accent);color:white}
+.btn-cancel-edit{background:rgba(80,80,80,0.55);color:#bbb}
+
+/* ---- Add memo row ---- */
+.add-memo-row{display:flex;gap:7px;margin-top:8px}
+.add-memo-row textarea{flex:1;min-height:52px}
+.btn-add-memo{background:rgba(30,143,168,0.85);border:none;border-radius:10px;color:white;font-size:12px;padding:0 12px;cursor:pointer;white-space:nowrap;font-family:inherit}
+
+/* ---- Colors ---- */
+.color-row{display:flex;gap:9px;flex-wrap:wrap;margin-top:7px}
+.color-dot{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;transition:transform .1s}
+.color-dot.selected{border-color:white;transform:scale(1.18)}
+
+/* ---- Save button ---- */
+.btn-save{width:100%;background:rgba(0,0,0,0.3);border:1px solid rgba(100,200,220,0.5);border-radius:26px;color:#7ecfea;font-size:14px;font-weight:500;padding:13px;cursor:pointer;margin-top:16px;font-family:inherit}
+
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="safe-top"></div>
+  <div class="header">
+    <span style="width:34px"></span>
+    <h1>プレーヤーメモ</h1>
+    <button class="btn-icon" id="addBtn">＋</button>
+  </div>
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="🔍　名前で検索...">
+  </div>
+  <div class="player-list" id="playerList"></div>
+  <div class="safe-bot"></div>
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="editModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">新しいプレーヤー</span>
+      <button class="btn-icon" id="closeModal" style="font-size:18px">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="avatar-section">
+        <div class="avatar-lg" id="avatarPicker">
+          <span id="avatarPlaceholder">👤</span>
+          <img id="avatarPreview" class="hidden">
+          <div class="avatar-edit-badge">✎</div>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" class="hidden">
+      </div>
+
+      <div class="field-label">プレーヤー名</div>
+      <input type="text" id="playerNameInput" placeholder="名前を入力">
+
+      <div class="field-label">メモ一覧</div>
+      <div class="memo-list" id="memoList"></div>
+      <div class="add-memo-row">
+        <textarea id="newMemoInput" placeholder="新しいメモを入力..."></textarea>
+        <button class="btn-add-memo" id="addMemoBtn">追加</button>
+      </div>
+
+      <div class="field-label">アイコン枠の色（レベル）</div>
+      <div class="color-row" id="colorRow"></div>
+
+      <button class="btn-save" id="saveBtn">✓ 保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS=[
+  {val:'none',css:'rgba(80,120,140,0.4)'},
+  {val:'#888',css:'#888'},
+  {val:'#4fc3f7',css:'#4fc3f7'},
+  {val:'#81c784',css:'#81c784'},
+  {val:'#ffb74d',css:'#ffb74d'},
+  {val:'#e57373',css:'#e57373'},
+  {val:'#ce93d8',css:'#ce93d8'},
+  {val:'#ffd54f',css:'#ffd54f'},
+];
+
+function fmtDate(ts){
+  if(!ts)return'';
+  const d=new Date(ts);
+  return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+let players=JSON.parse(localStorage.getItem('pnotes_v3')||'[]');
+let editingId=null,currentAvatar=null,currentColor='none',currentMemos=[],editingMemoIdx=null;
+
+function save(){localStorage.setItem('pnotes_v3',JSON.stringify(players));}
+
+function renderList(filter=''){
+  const list=document.getElementById('playerList');
+  const fil=players.filter(p=>(p.name||'').toLowerCase().includes(filter.toLowerCase()));
+  if(!fil.length){list.innerHTML=`<div class="empty">プレーヤーがいません<br>右上の ＋ ボタンで追加してください</div>`;return;}
+  list.innerHTML=fil.map(p=>{
+    const ring=p.color&&p.color!=='none'?`border:3px solid ${p.color};`:'';
+    const last=p.memos&&p.memos.length?p.memos[p.memos.length-1].text:'';
+    const cnt=p.memos&&p.memos.length?`<span class="card-count">${p.memos.length}件</span>`:'';
+    const img=p.avatar?`<img src="${p.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`:`<span>👤</span>`;
+    return `<div class="player-card" onclick="openEdit('${p.id}')">
+      <div class="avatar" style="${ring}">${img}</div>
+      <div class="card-info">
+        <div class="card-name">${p.name||'名前なし'}</div>
+        <div class="card-preview">${last||'メモなし'}</div>
+      </div>${cnt}
+    </div>`;
+  }).join('');
+}
+
+function renderMemos(){
+  const ml=document.getElementById('memoList');
+  if(!currentMemos.length){ml.innerHTML='<div style="font-size:12px;color:rgba(160,220,240,0.35);padding:4px 0">まだメモがありません</div>';return;}
+  ml.innerHTML=currentMemos.map((m,i)=>{
+    const dateHtml=m.editedAt
+      ?`<div class="memo-date was-edited">編集: ${fmtDate(m.editedAt)}　<span style="opacity:.65">作成: ${fmtDate(m.createdAt)}</span></div>`
+      :`<div class="memo-date">作成: ${fmtDate(m.createdAt)}</div>`;
+    if(editingMemoIdx===i){
+      return `<div class="memo-item"><div class="memo-edit-area">
+        <textarea id="editMemoTA" rows="3">${m.text}</textarea>
+        <div class="memo-edit-btns">
+          <button class="btn-cancel-edit" onclick="cancelEditMemo()">キャンセル</button>
+          <button class="btn-confirm" onclick="confirmEditMemo(${i})">確定</button>
+        </div>
+      </div>${dateHtml}</div>`;
+    }
+    return `<div class="memo-item">
+      <div class="memo-view">
+        <span class="memo-text">${m.text}</span>
+        <div class="memo-actions">
+          <button class="memo-btn edit" onclick="startEditMemo(${i})">✎</button>
+          <button class="memo-btn del" onclick="delMemo(${i})">✕</button>
+        </div>
+      </div>${dateHtml}
+    </div>`;
+  }).join('');
+  if(editingMemoIdx!==null){const ta=document.getElementById('editMemoTA');if(ta){ta.focus();ta.selectionStart=ta.value.length;}}
+}
+
+function startEditMemo(i){editingMemoIdx=i;renderMemos();}
+function cancelEditMemo(){editingMemoIdx=null;renderMemos();}
+function confirmEditMemo(i){
+  const ta=document.getElementById('editMemoTA');if(!ta)return;
+  const val=ta.value.trim();
+  if(val){currentMemos[i].text=val;currentMemos[i].editedAt=Date.now();}
+  editingMemoIdx=null;renderMemos();
+}
+function delMemo(i){currentMemos.splice(i,1);if(editingMemoIdx===i)editingMemoIdx=null;renderMemos();}
+
+function renderColors(){
+  document.getElementById('colorRow').innerHTML=COLORS.map(c=>`<div class="color-dot${currentColor===c.val?' selected':''}" style="background:${c.css}" onclick="pickColor('${c.val}')"></div>`).join('');
+}
+function pickColor(v){currentColor=v;renderColors();}
+
+function openModal(){document.getElementById('editModal').classList.add('open');}
+function closeModal(){document.getElementById('editModal').classList.remove('open');}
+
+function openNew(){
+  editingId=null;currentAvatar=null;currentColor='none';currentMemos=[];editingMemoIdx=null;
+  document.getElementById('modalTitle').textContent='新しいプレーヤー';
+  document.getElementById('playerNameInput').value='';
+  document.getElementById('newMemoInput').value='';
+  document.getElementById('avatarPreview').classList.add('hidden');
+  document.getElementById('avatarPlaceholder').classList.remove('hidden');
+  document.getElementById('avatarPicker').style.border='3px solid transparent';
+  renderMemos();renderColors();openModal();
+}
+
+function openEdit(id){
+  const p=players.find(x=>x.id===id);if(!p)return;
+  editingId=id;currentAvatar=p.avatar||null;currentColor=p.color||'none';
+  currentMemos=JSON.parse(JSON.stringify(p.memos||[]));editingMemoIdx=null;
+  document.getElementById('modalTitle').textContent='プレーヤー編集';
+  document.getElementById('playerNameInput').value=p.name||'';
+  document.getElementById('newMemoInput').value='';
+  if(p.avatar){
+    document.getElementById('avatarPreview').src=p.avatar;
+    document.getElementById('avatarPreview').classList.remove('hidden');
+    document.getElementById('avatarPlaceholder').classList.add('hidden');
+  } else {
+    document.getElementById('avatarPreview').classList.add('hidden');
+    document.getElementById('avatarPlaceholder').classList.remove('hidden');
+  }
+  const ring=p.color&&p.color!=='none'?`3px solid ${p.color}`:'3px solid transparent';
+  document.getElementById('avatarPicker').style.border=ring;
+  renderMemos();renderColors();openModal();
+}
+
+document.getElementById('addMemoBtn').onclick=function(){
+  const t=document.getElementById('newMemoInput').value.trim();if(!t)return;
+  currentMemos.push({text:t,createdAt:Date.now(),editedAt:null});
+  document.getElementById('newMemoInput').value='';
+  editingMemoIdx=null;renderMemos();
+};
+
+document.getElementById('saveBtn').onclick=function(){
+  const name=document.getElementById('playerNameInput').value.trim();
+  const ring=currentColor&&currentColor!=='none'?`3px solid ${currentColor}`:'3px solid transparent';
+  document.getElementById('avatarPicker').style.border=ring;
+  if(editingId){
+    const p=players.find(x=>x.id===editingId);
+    if(p){p.name=name;p.avatar=currentAvatar;p.color=currentColor;p.memos=JSON.parse(JSON.stringify(currentMemos));}
+  } else {
+    players.push({id:Date.now().toString(),name,avatar:currentAvatar,color:currentColor,memos:JSON.parse(JSON.stringify(currentMemos))});
+  }
+  save();renderList(document.getElementById('searchInput').value);closeModal();
+};
+
+document.getElementById('closeModal').onclick=closeModal;
+document.getElementById('editModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+document.getElementById('addBtn').onclick=openNew;
+document.getElementById('searchInput').oninput=function(){renderList(this.value);};
+document.getElementById('avatarPicker').onclick=function(){document.getElementById('fileInput').click();};
+document.getElementById('fileInput').onchange=function(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=function(ev){
+    currentAvatar=ev.target.result;
+    document.getElementById('avatarPreview').src=currentAvatar;
+    document.getElementById('avatarPreview').classList.remove('hidden');
+    document.getElementById('avatarPlaceholder').classList.add('hidden');
+  };
+  r.readAsDataURL(f);
+};
+
+renderList();
+</script>
+</body>
+</html>
